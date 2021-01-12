@@ -19,6 +19,12 @@ nltk.download('wordnet')
 
 
 def load_data(database_filepath):
+    """
+    Loads database and returns values for classification
+    :param database_filepath: db to read from
+    :return: X: input texts with genre classifications, Y: labels, categories: names of categories, dummy_cols:
+        names of columns corresponding to dummy genres
+    """
     engine = sqlalchemy.create_engine('sqlite:///{}'.format(database_filepath))
     df = pd.read_sql('messages', engine).set_index('id')
     X = df['message']
@@ -32,6 +38,11 @@ def load_data(database_filepath):
 
 
 def tokenize(text):
+    """
+    Tokenizes text by removing punctuation, lowercasing, splitting words, and stemming
+    :param text: text to tokenize
+    :return: list of tokens
+    """
     text = text.translate(str.maketrans('', '', string.punctuation))
     tokens = nltk.word_tokenize(text)
     lemmatizer = nltk.WordNetLemmatizer()
@@ -100,6 +111,14 @@ def build_model(dummy_cols):
 
 
 def evaluate_model(model, X_test, Y_test, category_names):
+    """
+    Evaluates model by printing out f1-scores for each category, plus average f1 score
+    :param model: model to evaluate
+    :param X_test: training data
+    :param Y_test: training labels
+    :param category_names: names of categories corresponding to training labels
+    :return: none
+    """
     Y_pred = model.predict(X_test)
     f1_scores = []
     for i, category in enumerate(category_names):
@@ -115,10 +134,20 @@ def evaluate_model(model, X_test, Y_test, category_names):
 
 
 def save_model(model, model_filepath):
+    """
+    Saves model to pickle
+    :param model: model to save
+    :param model_filepath: file to save it in. overwritten if exists.
+    :return: none
+    """
     dump(model, model_filepath)
 
 
 def main():
+    """
+    Main function to train model
+    :return: none
+    """
     if len(sys.argv) == 3:
         database_filepath, model_filepath = sys.argv[1:]
         print('Loading data...\n    DATABASE: {}'.format(database_filepath))

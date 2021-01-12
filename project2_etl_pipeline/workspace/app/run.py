@@ -22,6 +22,11 @@ app = Flask(__name__)
 
 
 def tokenize(text):
+    """
+    Tokenizes text, removing stopwords, lowercases, and removes punctuation
+    :param text: text to tokenize
+    :return: list of tokens
+    """
     text = text.translate(str.maketrans('', '', string.punctuation))
     tokens = word_tokenize(text)
     lemmatizer = WordNetLemmatizer()
@@ -152,6 +157,10 @@ def top_words_bar_chart(df, n=10):
 @app.route('/')
 @app.route('/index')
 def index():
+    """
+    Handles main index page
+    :return: index.html template to render
+    """
     graphs = [
         message_genre_bar_chart(df),
         category_bar_chart(df),
@@ -169,6 +178,10 @@ def index():
 # web page that handles user query and displays model results
 @app.route('/go')
 def go():
+    """
+    Handles go route
+    :return: go.html template to render
+    """
     # save user input in query
     query = request.args.get('query', '') 
     print(df.head())
