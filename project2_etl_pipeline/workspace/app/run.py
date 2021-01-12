@@ -1,20 +1,28 @@
 import json
+import string
+
 import plotly
 import pandas as pd
 
 from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize
+from nltk.corpus import stopwords
 
 from flask import Flask
 from flask import render_template, request, jsonify
 from plotly.graph_objs import Bar
-from sklearn.externals import joblib
+import joblib
 from sqlalchemy import create_engine
+
+import nltk
+nltk.download('stopwords')
 
 
 app = Flask(__name__)
 
+
 def tokenize(text):
+    text = text.translate(str.maketrans('', '', string.punctuation))
     tokens = word_tokenize(text)
     lemmatizer = WordNetLemmatizer()
 
@@ -23,30 +31,31 @@ def tokenize(text):
         clean_tok = lemmatizer.lemmatize(tok).lower().strip()
         clean_tokens.append(clean_tok)
 
-    return clean_tokens
+    s = stopwords.words('english')
+    result = []
+    for token in clean_tokens:
+        if token not in s:
+            result.append(token)
+
+    return result
+
 
 # load data
-engine = create_engine('sqlite:///../data/YourDatabaseName.db')
-df = pd.read_sql_table('YourTableName', engine)
+engine = create_engine('sqlite:///../data/disaster_data.db')
+df = pd.read_sql_table('messages', engine)
 
 # load model
-model = joblib.load("../models/your_model_name.pkl")
+model = joblib.load("../models/model.pickle")
 
-
-# index webpage displays cool visuals and receives user input text for model
-@app.route('/')
-@app.route('/index')
-def index():
-    
-    # extract data needed for visuals
-    # TODO: Below is an example - modify to extract data for your own visuals
+def message_genre_bar_chart(df):
+    """
+    Creates a dictionary suitable for plotly of a barchart of the genres
+    :param df: pandas dataframe containing data
+    :return: A dictionary of the barchart info
+    """
     genre_counts = df.groupby('genre').count()['message']
     genre_names = list(genre_counts.index)
-    
-    # create visuals
-    # TODO: Below is an example - modify to create your own visuals
-    graphs = [
-        {
+    return {
             'data': [
                 Bar(
                     x=genre_names,
@@ -64,6 +73,87 @@ def index():
                 }
             }
         }
+
+
+def category_bar_chart(df):
+    """
+    Creates a dictionary suitable for plotly of a barchart of the labeled categories
+    :param df: pandas dataframe containing data
+    :return: A dictionary of the barchart info
+    """
+    label_names = df.drop(['message', 'original', 'genre', 'id'], axis=1).columns
+    label_counts = []
+    for column in label_names:
+        label_counts.append(df[column].sum())
+    return {
+            'data': [
+                Bar(
+                    x=label_names,
+                    y=label_counts
+                )
+            ],
+
+            'layout': {
+                'title': 'Distribution of Labelled Categories',
+                'yaxis': {
+                    'title': "Count",
+                    'type': 'log'
+                },
+                'xaxis': {
+                    'title': "Category"
+                }
+            }
+        }
+
+def top_words_bar_chart(df, n=10):
+    """
+    Returns a barchart of the most common word stems in 'message', aside from stopwords
+    :param df: Dataframe containing 'message' column
+    :param n: number of words to keep, default 10
+    :return:
+    """
+    messages = df['message'].values
+    word_counts = {}
+    for message in messages:
+        tokens = tokenize(message)
+        for token in tokens:
+            if token in word_counts:
+                word_counts[token] += 1
+            else:
+                word_counts[token] = 1
+
+    items = sorted(word_counts.items(), key=lambda x: x[1], reverse=True)
+    items = items[0:n]
+    words = list(map(lambda x: x[0], items))
+    counts = list(map(lambda x: x[1], items))
+    return {
+            'data': [
+                Bar(
+                    x=words,
+                    y=counts
+                )
+            ],
+
+            'layout': {
+                'title': 'Most common word stems (outside stopwords)',
+                'yaxis': {
+                    'title': "Count",
+                },
+                'xaxis': {
+                    'title': "Word"
+                }
+            }
+        }
+
+
+# index webpage displays cool visuals and receives user input text for model
+@app.route('/')
+@app.route('/index')
+def index():
+    graphs = [
+        message_genre_bar_chart(df),
+        category_bar_chart(df),
+        top_words_bar_chart(df)
     ]
     
     # encode plotly graphs in JSON
@@ -81,6 +171,8 @@ def go():
     query = request.args.get('query', '') 
 
     # use model to predict classification for query
+    # For now, assume that this is a 'direct' genre message
+    # TODO: Add a dropdown so that the user can select the genre
     classification_labels = model.predict([query])[0]
     classification_results = dict(zip(df.columns[4:], classification_labels))
 

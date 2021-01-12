@@ -11,23 +11,41 @@ def load_data(messages_filepath, categories_filepath):
     """
     messages_df = pd.read_csv('disaster_messages.csv')
     categories_df = pd.read_csv('disaster_categories.csv')
-    return messages_df.merge(categories_df, how='left', on='id').set_index('id')
+    # Not much point keeping unlabeled messages, or categories without a matching message
+    return messages_df.merge(categories_df, how='inner', on='id').set_index('id')
+
+def classify_label(label):
+    """
+    Classifies a label as 0 or 1, assuming label is formatted as "label-[digit]"
+    Any value other than 0 after the hyphen is interpreted as a 1 (the dataset contains some
+    cases where a 2 is there)
+    :param label: string formatted as "label-value"
+    :return: 0 or 1
+    """
+    return 0 if label.split('-')[1] == '0' else 1
 
 def clean_data(df):
     """
     Takes the "raw" data loaded from the csv files and returns a dataframe organized os that each category
     is in its own column.
     :param df: pandas dataframe consisting of data rawly loaded from db
-    :return: clean db so semi-colon separated categories are c
+    :return: clean db so semi-colon separated categories are changed to separate columns, remove duplicate messages
     """
     categories_df = df.categories.str.split(';', expand=True)
     first_row = categories_df.iloc[0]
     colnames = first_row.map(lambda x: x.split('-')[0])
     categories_df.columns = colnames
     for column in categories_df:
-        categories_df[column] = categories_df[column].map(lambda x: x.split('-')[1]).astype(int)
-    df.drop('categories', axis=1, inplace=True)
-    return df.merge(categories_df, how='left', left_index=True, right_index=True)
+        categories_df[column] = categories_df[column].map(classify_label).astype(int)
+    df.drop(['categories'], axis=1, inplace=True)
+    df = df.merge(categories_df, how='inner', left_index=True, right_index=True)
+
+    # It turns out that there are rows that have identical messages, but different labels.  However, to keep things
+    # simple, will just drop duplicate messages and take the first row that had that message, but first will lowercase
+    df['message'] = df['message'].str.lower()
+    df = df.drop_duplicates(subset=['message'])
+    print(df.shape[0])
+    return df
 
 def save_data(df, database_filename, if_exists):
     """
