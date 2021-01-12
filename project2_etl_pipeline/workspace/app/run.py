@@ -47,6 +47,7 @@ df = pd.read_sql_table('messages', engine)
 # load model
 model = joblib.load("../models/model.pickle")
 
+
 def message_genre_bar_chart(df):
     """
     Creates a dictionary suitable for plotly of a barchart of the genres
@@ -104,6 +105,7 @@ def category_bar_chart(df):
                 }
             }
         }
+
 
 def top_words_bar_chart(df, n=10):
     """
@@ -169,11 +171,13 @@ def index():
 def go():
     # save user input in query
     query = request.args.get('query', '') 
-
+    print(df.head())
     # use model to predict classification for query
     # For now, assume that this is a 'direct' genre message
     # TODO: Add a dropdown so that the user can select the genre
-    classification_labels = model.predict([query])[0]
+    row = [(query, '', 0, 0 )]
+    to_predict = pd.DataFrame(row, columns=['message', 'original', 'news', 'social'], index=[0])
+    classification_labels = model.predict(to_predict)[0]
     classification_results = dict(zip(df.columns[4:], classification_labels))
 
     # This will render the go.html Please see that file. 

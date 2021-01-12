@@ -2,22 +2,20 @@ import sys
 import numpy as np
 import pandas as pd
 import sqlalchemy
-
+import string
 import nltk
-from sklearn.compose import ColumnTransformer, make_column_selector, make_column_transformer
+
+from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
 from sklearn.pipeline import FeatureUnion, Pipeline
+from joblib import dump
+
+from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.metrics import f1_score, classification_report
 
 nltk.download('punkt')
 nltk.download('wordnet')
-
-import string
-
-from joblib import dump, load
-
-from sklearn.model_selection import train_test_split, GridSearchCV
-from sklearn.metrics import recall_score, f1_score, precision_score, classification_report
 
 
 def load_data(database_filepath):
@@ -31,6 +29,7 @@ def load_data(database_filepath):
     categories = Y.columns
     print(X.head())
     return X, Y, categories, dummy_cols
+
 
 def tokenize(text):
     text = text.translate(str.maketrans('', '', string.punctuation))
@@ -59,9 +58,18 @@ class CustomCountVectorizer:
 
     def transform(self, X):
         """transforms X['message'] in the underlying CountVectorizer"""
-        return self.count_vectorizer.transform(X['message'])
+        result = self.count_vectorizer.transform(X['message'])
+        print(result)
+        return result
+
 
 def build_model(dummy_cols):
+    """
+    This builds a model that will take the text, tokenize it and transform using count->tfidf transformers,
+    then combine them with the genre data, to pass into a random forest classifier.
+    :param dummy_cols: columns holding the genre dummy vars
+    :return:
+    """
     text_pipeline = Pipeline([
         ('vect', CustomCountVectorizer()),
         ('tfidf', TfidfTransformer())
@@ -75,12 +83,12 @@ def build_model(dummy_cols):
     ])
 
     # Note: This severely curtails the number of parameters in the interests of running the model in a reasonable time.
-    # However, you may uncomment these, but expect extreme delays.
+    # However, you may uncomment these (and add more values), but expect extreme delays.
     parameters = {
-        'features__text_pipeline__vect__ngram_range': ((1, 1), (1, 2), (2, 2)),
+        'features__text_pipeline__vect__ngram_range': ((1, 2), (2, 2)),
         # 'features__text_pipeline__vect__stop_words': ('english', None),
         # 'features__text_pipeline__vect__max_df': (0.5, 1.0),
-        # 'features__text_pipeline__vect__max_features': (None, 10000),
+        'features__text_pipeline__vect__max_features': [5000],
         # 'features__text_pipeline__tfidf__use_idf': (True, False),
         # 'clf__n_estimators': [50, 100, 200],
         'clf__min_samples_split': [3]
@@ -88,7 +96,7 @@ def build_model(dummy_cols):
 
     cv = GridSearchCV(pipeline, param_grid=parameters)
 
-    return cv
+    return pipeline
 
 
 def evaluate_model(model, X_test, Y_test, category_names):
@@ -105,12 +113,10 @@ def evaluate_model(model, X_test, Y_test, category_names):
         print(classification_report(y_test, y_pred, zero_division=0))
     print("Average f1 score: ", np.mean(f1_scores))
 
+
 def save_model(model, model_filepath):
     dump(model, model_filepath)
 
-def cble(x):
-    print(x)
-    return ['message']
 
 def main():
     if len(sys.argv) == 3:

@@ -2,6 +2,7 @@ import sys
 import pandas as pd
 import sqlalchemy
 
+
 def load_data(messages_filepath, categories_filepath):
     """
     Loads data from .csv files containing message contents and category labels
@@ -9,10 +10,11 @@ def load_data(messages_filepath, categories_filepath):
     :param categories_filepath: file containing categories corresponding to these messages
     :return: pandas dataframe merging data from these two sets together
     """
-    messages_df = pd.read_csv('disaster_messages.csv')
-    categories_df = pd.read_csv('disaster_categories.csv')
+    messages_df = pd.read_csv(messages_filepath)
+    categories_df = pd.read_csv(categories_filepath)
     # Not much point keeping unlabeled messages, or categories without a matching message
     return messages_df.merge(categories_df, how='inner', on='id').set_index('id')
+
 
 def classify_label(label):
     """
@@ -23,6 +25,7 @@ def classify_label(label):
     :return: 0 or 1
     """
     return 0 if label.split('-')[1] == '0' else 1
+
 
 def clean_data(df):
     """
@@ -46,6 +49,7 @@ def clean_data(df):
     df = df.drop_duplicates(subset=['message'])
     print(df.shape[0])
     return df
+
 
 def save_data(df, database_filename, if_exists):
     """
